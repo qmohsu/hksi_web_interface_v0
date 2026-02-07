@@ -9,8 +9,10 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import math
 import time
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import AsyncGenerator
 
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
@@ -125,7 +127,7 @@ async def _on_position_message(topic: str, payload: str) -> None:
     for raw_pos in batch.positions:
         # Skip anchors — handled separately for start-line definition
         if raw_pos.device_id >= 100:
-            _update_anchor(raw_pos.device_id, raw_pos)
+            await _update_anchor_and_broadcast(raw_pos.device_id, raw_pos)
             continue
 
         # Look up athlete info
@@ -172,13 +174,71 @@ async def _on_position_message(topic: str, payload: str) -> None:
         _messages_relayed += 1
 
 
-def _update_anchor(device_id: int, raw_pos) -> None:
-    """Cache anchor positions and detect start-line changes."""
+_last_start_line_broadcast_ts: float = 0.0  # rate-limit start-line broadcasts
+
+
+async def _update_anchor_and_broadcast(device_id: int, raw_pos) -> None:
+    """Cache anchor positions and broadcast start-line definition when both anchors available."""
+    global _last_start_line_broadcast_ts, _messages_relayed
+
     _anchor_positions[device_id] = {
         "device_id": device_id,
         "lat": raw_pos.latitude,
         "lon": raw_pos.longitude,
     }
+
+    # Check if both anchors are available
+    left_id = settings.anchor_left_device_id
+    right_id = settings.anchor_right_device_id
+    if left_id not in _anchor_positions or right_id not in _anchor_positions:
+        return
+
+    # Rate-limit: broadcast at most once every 5 seconds
+    now = time.time()
+    if now - _last_start_line_broadcast_ts < 5.0:
+        return
+    _last_start_line_broadcast_ts = now
+
+    left = _anchor_positions[left_id]
+    right = _anchor_positions[right_id]
+
+    # Compute gate length using haversine approximation
+    dlat = math.radians(right["lat"] - left["lat"])
+    dlon = math.radians(right["lon"] - left["lon"])
+    a = math.sin(dlat / 2) ** 2 + math.cos(math.radians(left["lat"])) * math.cos(
+        math.radians(right["lat"])
+    ) * math.sin(dlon / 2) ** 2
+    gate_length_m = 6371000 * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+    now_ms = int(now * 1000)
+    msg = WSMessage(
+        type=MessageType.START_LINE_DEFINITION,
+        seq=_next_seq(),
+        ts_ms=now_ms,
+        session_id=_session_id,
+        payload=StartLineDefinitionPayload(
+            anchor_left=AnchorPoint(
+                device_id=left_id,
+                anchor_id=f"A{left_id - 101}",
+                lat=left["lat"],
+                lon=left["lon"],
+            ),
+            anchor_right=AnchorPoint(
+                device_id=right_id,
+                anchor_id=f"A{right_id - 101}",
+                lat=right["lat"],
+                lon=right["lon"],
+            ),
+            gate_length_m=round(gate_length_m, 2),
+            quality=GateQuality.GOOD,
+        ),
+    )
+    await _broadcast_and_record(msg.to_json_str())
+    _messages_relayed += 1
+    logger.info(
+        "Start-line definition broadcast: %.6f,%.6f → %.6f,%.6f (%.1f m)",
+        left["lat"], left["lon"], right["lat"], right["lon"], gate_length_m,
+    )
 
 
 async def _on_gate_message(topic: str, payload: str) -> None:
@@ -555,6 +615,15 @@ async def export_session(
                 "Content-Disposition": f'attachment; filename="{session_id}.json"'
             },
         )
+
+
+# ---------------------------------------------------------------------------
+# Serve frontend static files (if built)
+# ---------------------------------------------------------------------------
+
+_frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
+if _frontend_dist.exists():
+    app.mount("/", StaticFiles(directory=str(_frontend_dist), html=True), name="frontend")
 
 
 # ---------------------------------------------------------------------------
