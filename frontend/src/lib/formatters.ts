@@ -43,7 +43,28 @@ export function formatTime(tsMs: number): string {
   return d.toLocaleTimeString('en-GB', { hour12: false });
 }
 
-/** Status → Tailwind color class mappings. */
+/** Format wind direction as compass label. */
+export function formatWindDir(deg: number): string {
+  const dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE',
+                'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW'];
+  const idx = Math.round(((deg % 360) + 360) % 360 / 22.5) % 16;
+  return dirs[idx];
+}
+
+/** Format bearing in degrees. */
+export function formatBearing(deg: number | null): string {
+  if (deg === null) return '—';
+  return `${deg.toFixed(1)}°`;
+}
+
+/** Format measurement distance. */
+export function formatMeasureDistance(m: number | null): string {
+  if (m === null) return '—';
+  if (m >= 1000) return `${(m / 1000).toFixed(2)} km`;
+  return `${m.toFixed(1)} m`;
+}
+
+/** Status → Tailwind bg color class. */
 export const STATUS_COLORS: Record<AthleteStatus, string> = {
   SAFE: 'bg-green-500',
   APPROACHING: 'bg-yellow-500',
@@ -53,7 +74,7 @@ export const STATUS_COLORS: Record<AthleteStatus, string> = {
   STALE: 'bg-gray-400',
 };
 
-/** Status → text color for contrast. */
+/** Status → text color for contrast on the pill. */
 export const STATUS_TEXT_COLORS: Record<AthleteStatus, string> = {
   SAFE: 'text-white',
   APPROACHING: 'text-black',
@@ -62,3 +83,40 @@ export const STATUS_TEXT_COLORS: Record<AthleteStatus, string> = {
   OCS: 'text-white',
   STALE: 'text-white',
 };
+
+/** Status → small icon character for the pill. */
+export const STATUS_ICONS: Record<AthleteStatus, string> = {
+  SAFE: '\u2714',       // ✔
+  APPROACHING: '\u25B6', // ▶
+  RISK: '\u26A0',        // ⚠
+  CROSSED: '\u2716',     // ✖
+  OCS: '\u26D4',         // ⛔
+  STALE: '\u25CF',       // ●
+};
+
+/** Compute haversine distance between two lat/lon points in meters. */
+export function haversineDistance(
+  lat1: number, lon1: number, lat2: number, lon2: number
+): number {
+  const R = 6_371_000;
+  const dLat = (lat2 - lat1) * Math.PI / 180;
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(lat1 * Math.PI / 180) *
+    Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+/** Compute bearing from point 1 to point 2 in degrees. */
+export function computeBearing(
+  lat1: number, lon1: number, lat2: number, lon2: number
+): number {
+  const dLon = (lon2 - lon1) * Math.PI / 180;
+  const y = Math.sin(dLon) * Math.cos(lat2 * Math.PI / 180);
+  const x =
+    Math.cos(lat1 * Math.PI / 180) * Math.sin(lat2 * Math.PI / 180) -
+    Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLon);
+  return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
+}

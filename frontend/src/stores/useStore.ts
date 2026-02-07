@@ -2,7 +2,7 @@
  * Central state store for the Coach Monitor UI.
  *
  * Single predictable state container for: athletes, tracks, start line,
- * alerts, device health, and connection status.
+ * alerts, device health, connection status, and map display controls.
  * (rule 25-typescript-frontend-style: single reducer/store)
  *
  * Time-series data uses bounded ring buffers.
@@ -27,11 +27,13 @@ import type { ConnectionStatus } from '../data/streamClient';
 // ---------------------------------------------------------------------------
 
 const MAX_TRACK_POINTS = 200; // Per athlete
+const AVG_SOG_WINDOW_MS = 10_000; // Rolling 10s window for avg SOG
 
 export interface TrackPoint {
   lat: number;
   lon: number;
   ts_ms: number;
+  sog_kn: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -58,12 +60,46 @@ export interface AthleteState {
   speed_to_line_mps: number | null;
   status: AthleteStatus;
   position_quality: number | null;
+  // Computed
+  avg_sog_kn: number | null;
   // Track history
   track: TrackPoint[];
   // UI state
   pinned: boolean;
   selected: boolean;
   last_update_ms: number;
+}
+
+// ---------------------------------------------------------------------------
+// Map display controls
+// ---------------------------------------------------------------------------
+
+export interface MapControls {
+  showTracks: boolean;
+  showLabels: boolean;
+  followSelected: boolean;
+  trackTailSeconds: number; // 0 = all, otherwise last N seconds
+}
+
+// ---------------------------------------------------------------------------
+// Wind data (placeholder until relay provides it)
+// ---------------------------------------------------------------------------
+
+export interface WindData {
+  direction_deg: number; // Where wind is COMING FROM (0=N, 90=E)
+  speed_kn: number;
+}
+
+// ---------------------------------------------------------------------------
+// Measurement state
+// ---------------------------------------------------------------------------
+
+export interface MeasurementState {
+  active: boolean;
+  startLatLon: [number, number] | null;
+  endLatLon: [number, number] | null;
+  distance_m: number | null;
+  bearing_deg: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -91,10 +127,19 @@ interface AppState {
   // Heartbeat
   heartbeat: HeartbeatPayload | null;
 
-  // UI controls
+  // UI controls — board
   sortColumn: string;
   sortAscending: boolean;
   filterText: string;
+
+  // UI controls — map
+  mapControls: MapControls;
+
+  // Wind (mock/manual for now)
+  wind: WindData | null;
+
+  // Measurement tool
+  measurement: MeasurementState;
 
   // Actions
   setConnectionStatus: (s: ConnectionStatus) => void;
@@ -103,6 +148,19 @@ interface AppState {
   selectAthlete: (athleteId: string | null) => void;
   setSortColumn: (col: string) => void;
   setFilterText: (text: string) => void;
+  setMapControl: <K extends keyof MapControls>(key: K, value: MapControls[K]) => void;
+  setWind: (wind: WindData | null) => void;
+  setMeasurement: (m: Partial<MeasurementState>) => void;
+  clearMeasurement: () => void;
+}
+
+/** Compute rolling average SOG from track points within the window. */
+function computeAvgSog(track: TrackPoint[], now: number): number | null {
+  const cutoff = now - AVG_SOG_WINDOW_MS;
+  const recent = track.filter((p) => p.ts_ms >= cutoff && p.sog_kn !== null);
+  if (recent.length === 0) return null;
+  const sum = recent.reduce((acc, p) => acc + (p.sog_kn ?? 0), 0);
+  return Math.round((sum / recent.length) * 10) / 10;
 }
 
 export const useStore = create<AppState>((set) => ({
@@ -118,6 +176,20 @@ export const useStore = create<AppState>((set) => ({
   sortColumn: 'dist_to_line_m',
   sortAscending: true,
   filterText: '',
+  mapControls: {
+    showTracks: true,
+    showLabels: true,
+    followSelected: false,
+    trackTailSeconds: 0,
+  },
+  wind: null,
+  measurement: {
+    active: false,
+    startLatLon: null,
+    endLatLon: null,
+    distance_m: null,
+    bearing_deg: null,
+  },
 
   // Actions
   setConnectionStatus: (status) => set({ connectionStatus: status }),
@@ -133,10 +205,10 @@ export const useStore = create<AppState>((set) => ({
           for (const pos of positions) {
             const existing = athletes[pos.athlete_id];
             const track = existing?.track ?? [];
-            // Append to ring buffer
+            // Append to ring buffer — include sog for avg computation
             const newTrack = [
               ...track.slice(-(MAX_TRACK_POINTS - 1)),
-              { lat: pos.lat, lon: pos.lon, ts_ms: pos.device_ts_ms },
+              { lat: pos.lat, lon: pos.lon, ts_ms: pos.device_ts_ms, sog_kn: pos.sog_kn },
             ];
 
             athletes[pos.athlete_id] = {
@@ -146,6 +218,7 @@ export const useStore = create<AppState>((set) => ({
                 speed_to_line_mps: null,
                 status: 'SAFE' as AthleteStatus,
                 position_quality: null,
+                avg_sog_kn: null,
                 pinned: false,
                 selected: false,
               }),
@@ -162,6 +235,7 @@ export const useStore = create<AppState>((set) => ({
               device_ts_ms: pos.device_ts_ms,
               data_age_ms: pos.data_age_ms,
               track: newTrack,
+              avg_sog_kn: computeAvgSog(newTrack, now),
               last_update_ms: now,
             };
           }
@@ -264,4 +338,27 @@ export const useStore = create<AppState>((set) => ({
     })),
 
   setFilterText: (text) => set({ filterText: text }),
+
+  setMapControl: (key, value) =>
+    set((state) => ({
+      mapControls: { ...state.mapControls, [key]: value },
+    })),
+
+  setWind: (wind) => set({ wind }),
+
+  setMeasurement: (m) =>
+    set((state) => ({
+      measurement: { ...state.measurement, ...m },
+    })),
+
+  clearMeasurement: () =>
+    set({
+      measurement: {
+        active: false,
+        startLatLon: null,
+        endLatLon: null,
+        distance_m: null,
+        bearing_deg: null,
+      },
+    }),
 }));
