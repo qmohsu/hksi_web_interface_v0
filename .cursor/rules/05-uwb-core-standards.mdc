@@ -1,0 +1,57 @@
+---
+description: "HKSI Start-Gate System core standards (Backend + UI + Field ops)"
+globs: ["**/*"]
+alwaysApply: true
+---
+
+You are working on the **HKSI Windsurfing Start-Gate Monitoring system** (buoy/anchor network + athlete tags + gateway/RPi + server + Coach Monitor UI).
+
+## Non-negotiables
+- **Correctness > cleverness.** If assumptions are missing (time base, coordinate frames, start-line definition, message ordering), stop and define them in code + docs.
+- Treat open-water conditions as hostile: **packet loss, delay/jitter, out-of-order messages, NLOS/multipath, buoy drift, clock drift, intermittent 4G**.
+- **No silent failures.** Every dropped measurement must be counted and logged with a reason code, and **surface operationally** (health panel, degraded/offline badges, data-age indicators).
+- Keep interfaces **explicit and versioned** (protobuf / JSON schema). Backward compatibility matters.
+- **Keep the Coach Monitor UI minimal and coach-usable daily.** Prefer fewer, clearer metrics over dense dashboards.
+
+## Engineering standards
+- Prefer small, testable modules over monolith scripts.
+- Every feature ships with:
+  - unit tests (logic)
+  - integration/replay tests (data contracts)
+  - metrics/logs (field diagnosability)
+- All runtime settings come from config/env; **no hard-coded IPs/ports/keys**.
+
+## UI standards (Coach Monitor)
+- UI is not a high-rate oscilloscope: **throttle rendering** (e.g., 5–10 Hz) even if upstream is faster.
+- **Live and replay must share the same rendering pipeline** to avoid divergence.
+- Mandatory UX safety nets:
+  - show connection status and **data age** per athlete
+  - declutter controls (labels on/off, fade non-selected, tail length)
+  - graceful degradation when data drops (do not freeze; show "stale")
+- Primary UI outputs:
+  - distance-to-line (signed)
+  - time-to-line (ETA)
+  - start status + alerts
+  - replay + export
+  - system/device health (battery/link/fix quality where available)
+
+## Backend/realtime standards
+- Provide:
+  - WebSocket/SSE for realtime streams
+  - HTTP APIs for sessions, replay, and export
+- Time semantics must be explicit:
+  - event/device time vs server receive time
+  - monotonic ordering rules under reordering
+- Provide observability outputs (counters + histograms) for:
+  - latency
+  - packet loss/drop reasons
+  - solver/estimator health
+  - UI stream publish rate
+
+## Security & privacy
+- No credentials in repo; no unauthenticated admin endpoints on public interfaces.
+- GNSS locations can be sensitive. If stored/transmitted, document:
+  - what is stored
+  - retention
+  - who can access it (RBAC)
+- Avoid logging raw location unless needed; prefer session ids and summarized metrics.

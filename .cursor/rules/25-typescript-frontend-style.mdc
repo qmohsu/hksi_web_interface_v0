@@ -1,0 +1,54 @@
+---
+description: "TypeScript/Frontend engineering standards (React/Vue compatible)"
+globs: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.vue"]
+alwaysApply: false
+---
+
+Frontend implementation rules:
+
+## TypeScript basics
+- Prefer TypeScript over raw JS for anything non-trivial.
+- **No `any`** except at the untrusted boundary (e.g., network JSON parse) and it must be narrowed immediately.
+- Define shared DTOs / message types in a single place (e.g., `src/contracts/`), versioned with `schema_version`.
+
+## Data-layer pattern (required)
+- All realtime ingestion lives in one module (e.g., `src/data/streamClient.ts`) that:
+  - manages WebSocket lifecycle (connect/reconnect/backoff)
+  - parses/validates messages
+  - exposes a clean subscription API or hook
+  - emits connection status + last-seen timestamps
+- UI components must not open their own sockets.
+- Replay reader must reuse the same reducer/state update path as live mode.
+
+## State management
+- Use a predictable state container for stream state:
+  - a single reducer/store for: athletes, tracks, start line definition, alerts, device health, connection status
+- Keep time-series data bounded:
+  - ring buffer per athlete for track points
+  - cap memory growth (max points or max seconds)
+
+## Performance rules (maps + tables)
+- Batch incoming messages; update UI state at a throttled cadence (5–10 Hz).
+- Avoid re-render storms:
+  - memoize row renderers
+  - virtualize large tables when needed
+  - avoid creating new arrays/objects in tight loops
+- Prefer `requestAnimationFrame`-driven map updates for smoothness.
+
+## UI consistency
+- Always show units (knots, meters, seconds) or use a central formatter.
+- Always show data age indicators and stale/degraded state.
+
+## Testing expectations
+- Unit tests for:
+  - formatters
+  - status mapping
+  - time-to-line computation display (if computed client-side)
+- E2E tests for:
+  - selecting an athlete highlights row + map
+  - filter/sort behavior
+  - replay scrub/play/pause and export button flow
+
+## Dependency discipline
+- Do not add large UI libraries without explicit approval.
+- Prefer native browser APIs + lightweight utilities.

@@ -1,0 +1,50 @@
+---
+description: "QA + Test automation (scenario packs, e2e, performance)"
+globs: [
+  "**/qa/**", "**/e2e/**", "**/tests/**", "**/__tests__/**",
+  "**/*.spec.*", "**/*.test.*", "**/*playwright*", "**/*cypress*"
+]
+alwaysApply: false
+---
+
+QA/Test Engineer rules:
+
+## Test philosophy
+- Prefer repeatable, automated tests over manual checklists.
+- Every bug fix includes a regression test.
+
+## Scenario packs (required)
+Maintain a small library of recorded or simulated session packs:
+- CLEAN_START: normal approach and compliant crossings
+- CLUSTER_NEAR_LINE: many athletes congested near the start line
+- PACKET_LOSS_JITTER: 2–5% drops + delay/jitter + out-of-order bursts
+- DEVICE_DROPOUT: one buoy anchor offline for 30–60s
+- OCS_CASE: early crossing before start signal
+
+Each pack should be:
+- deterministic (same outputs on each run)
+- stored with metadata (schema_version, coordinate frame, units)
+- runnable via a mock WebSocket server to drive the UI
+
+## E2E tests (minimum)
+- Live mode:
+  - table filter and sort work
+  - selecting an athlete highlights row and map marker
+  - stale/disconnected banners appear when stream stops
+- Replay mode:
+  - play/pause/scrub works
+  - speed multiplier works
+  - jump-to-event works (when event markers exist)
+- Export:
+  - export button triggers download and handles failure gracefully
+
+## Performance regression (minimum)
+- 25 athletes, 10 Hz UI updates, 30 minutes replay:
+  - no unbounded memory growth
+  - UI remains responsive (no multi-second main-thread blocks)
+
+## Reliability validation
+- Verify that UI handles reconnect storms safely:
+  - exponential backoff
+  - no duplicated subscriptions
+  - no increasing message handlers over time (memory leak)

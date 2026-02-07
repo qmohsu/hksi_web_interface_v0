@@ -1,0 +1,28 @@
+---
+description: "Networking (UDP/TCP/WebSocket) and message schema rules"
+globs: ["**/*udp*", "**/*tcp*", "**/*socket*", "**/*ws*", "**/*websocket*", "**/*.proto", "**/*protobuf*", "**/*schema*"]
+alwaysApply: false
+---
+
+Network messaging rules:
+- Every message must include:
+  - schema_version
+  - source_id (anchor/tag id)
+  - seq number
+  - event_time (device time if available) and receive_time (gateway/server monotonic)
+  - units and frame id
+- Parsers must be defensive: size checks, timeouts, partial frames, invalid UTF-8 for JSON, etc.
+- Avoid "implicit defaults" (like default port numbers) in code; keep in config.
+
+Realtime API (Coach Monitor UI):
+- Prefer a single **WebSocket** endpoint for live UI, with an envelope:
+  - message_type
+  - schema_version
+  - session_id
+  - payload
+- UI should never need to infer units/frames; include them explicitly.
+- Backward compatibility: add fields, do not rename/remove; version schema when breaking.
+
+If using protobuf:
+- Keep messages backward compatible. Never reuse field numbers.
+- Include a top-level Envelope with schema_version and message_type.

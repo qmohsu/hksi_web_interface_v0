@@ -1,0 +1,74 @@
+---
+description: "Coach Monitor UI requirements (minimal coach UX + map + replay)"
+globs: [
+  "**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.vue",
+  "**/*.css", "**/*.scss", "**/*.html",
+  "**/web/**", "**/ui/**", "**/frontend/**"
+]
+alwaysApply: false
+---
+
+Coach Monitor UI rules (stakeholder-facing, field-usable):
+
+## Core UX intent
+- The UI must stay **minimal and coach-usable daily**.
+- Primary outputs (must be obvious within 5 seconds of opening the app):
+  - distance-to-line (signed)
+  - time-to-line (ETA)
+  - start status + alerts
+  - live + replay
+  - export
+  - system/device health (battery/link/fix quality when available)
+
+## Required layout
+- Default screen: two-pane layout
+  - Left: athlete list / start board (filter + sortable)
+  - Right: map (tracks + labels) + controls
+
+## Start board rules
+- Must support: filter by name/team, sort, pin/focus, show/hide athletes.
+- Columns should favor start-gate coaching, not "race ranking":
+  - Athlete/Team
+  - Status (SAFE/RISK/OCS/CROSSED/STALE)
+  - dist_to_line_m
+  - eta_to_line_s
+  - SOG (knots)
+  - COG (deg)
+  - data_age_ms
+
+## Map rules
+- Render:
+  - start line (buoy A ↔ buoy B)
+  - athletes (marker + heading)
+  - track tails (configurable tail length)
+  - optional labels (all / selected only / none)
+- Mandatory declutter controls:
+  - fade non-selected athletes
+  - tail length slider or presets
+  - labels toggle
+
+## Realtime behavior (must survive bad connectivity)
+- Never assume in-order delivery.
+- Show data age and connection status (global + per-athlete).
+- Reconnect with exponential backoff; do not spam the server.
+- Degrade gracefully:
+  - if stale, freeze the marker/label and show "STALE" badge
+  - if disconnected, keep last known state and show banner
+
+## Rendering performance
+- Throttle map redraw (e.g., 5–10 Hz) even if messages arrive faster.
+- Use a single data ingestion layer (WebSocket client + replay reader), not ad-hoc subscriptions inside many components.
+- Prefer incremental polyline updates / ring buffers for tracks.
+
+## Demo / replay mode (non-negotiable)
+- UI must run without hardware:
+  - replay a recorded session pack through the same pipeline as live messages
+- Replay controls:
+  - play/pause
+  - speed (0.5x/1x/2x/4x)
+  - timeline scrub
+  - jump-to-event (crossings/alerts) when events exist
+
+## Error handling
+- No silent failures:
+  - parse errors, schema mismatches, missing fields should surface as a non-blocking toast and be logged.

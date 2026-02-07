@@ -1,0 +1,28 @@
+---
+description: "Project architecture and module boundaries"
+globs: ["**/*"]
+alwaysApply: true
+---
+
+Architecture expectations:
+- Separate concerns:
+  - io/: serial, UDP/TCP, parsing, buffering
+  - proto/: message definitions + schema versioning
+  - localization/: estimation (EKF/UKF/PF), coordinate transforms, outlier rejection
+  - domain/: start-line crossing, race logic, metrics
+  - tools/: replay, sim data generation, log bundle utilities
+  - services/: systemd units, Docker entrypoints
+  - web/ or ui/: Coach Monitor frontend (map, board, alerts, replay)
+  - api/: HTTP + WebSocket handlers, auth/RBAC, session export
+  - qa/: scenario packs + e2e automation + performance regression
+
+Interfaces must be explicit:
+- Every network message includes: schema_version, source_id, seq, tx_timestamp, rx_timestamp, and units.
+- Avoid "magic" global singletons. Pass dependencies explicitly.
+
+Frontend data-layer expectations:
+- UI should consume realtime data through a single module/hook (e.g., `data/stream.ts`), not ad-hoc WebSocket usage in components.
+- Replay mode should reuse the same state update pipeline as live mode.
+
+Field diagnostics:
+- Every module must export counters: packets_in, packets_dropped_by_reason, parse_errors, outlier_rejections, solver_failures, latency_histograms.
