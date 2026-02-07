@@ -4,6 +4,8 @@
 Replays a session pack (.jsonl file) or generates synthetic data,
 serving the same WebSocket contract as the real relay service.
 
+Phase 2: includes session management, replay, and export APIs.
+
 Usage:
     python -m relay.mock_server                          # Generate synthetic data
     python -m relay.mock_server --pack data/session_packs/CLEAN_START.jsonl
@@ -22,9 +24,9 @@ from pathlib import Path
 from typing import Optional
 
 import uvicorn
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse
+from fastapi.responses import PlainTextResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from relay.models import (
@@ -44,6 +46,7 @@ from relay.models import (
     StartLineDefinitionPayload,
     WSMessage,
 )
+from relay.session_recorder import SessionRecorder
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
@@ -89,6 +92,11 @@ _session_id = "MOCK-SESSION"
 _start_time = time.time()
 _messages_sent = 0
 
+# Session recorder (points to session_packs dir)
+_session_data_dir = Path(__file__).parent / "data" / "session_packs"
+_recorder = SessionRecorder(_session_data_dir)
+_recording = False
+
 
 def _next_seq() -> int:
     global _seq
@@ -105,11 +113,10 @@ class SyntheticGenerator:
 
     def __init__(self) -> None:
         self._t0 = time.time()
-        # Each athlete gets an initial offset and approach speed
         self._states = []
         for i, athlete in enumerate(MOCK_ATHLETES):
             angle = (2 * math.pi * i) / len(MOCK_ATHLETES) + random.uniform(-0.3, 0.3)
-            dist = random.uniform(80, 200)  # Starting distance from line (meters)
+            dist = random.uniform(80, 200)
             speed_kn = random.uniform(5, 12)
             self._states.append({
                 "athlete": athlete,
@@ -122,7 +129,6 @@ class SyntheticGenerator:
             })
 
     def generate_positions(self) -> list[PositionEntry]:
-        """Generate a batch of position updates."""
         now_ms = int(time.time() * 1000)
         elapsed_s = time.time() - self._t0
         positions: list[PositionEntry] = []
@@ -132,11 +138,9 @@ class SyntheticGenerator:
 
         for state in self._states:
             athlete = state["athlete"]
-            # Simulate approach: distance decreases over time
             speed_mps = state["speed_kn"] / 1.94384
             dist_m = max(0.5, state["initial_dist_m"] - speed_mps * elapsed_s)
 
-            # Convert distance to lat/lon offset
             angle = state["angle"]
             lat_offset = dist_m * math.cos(angle) / 111320.0
             lon_offset = dist_m * math.sin(angle) / (111320.0 * math.cos(math.radians(mid_lat)))
@@ -144,9 +148,7 @@ class SyntheticGenerator:
             lat = mid_lat + lat_offset + random.uniform(-0.000005, 0.000005)
             lon = mid_lon + lon_offset + random.uniform(-0.000005, 0.000005)
 
-            # SOG: base speed + noise
             sog = state["speed_kn"] + random.uniform(-0.5, 0.5)
-            # COG: roughly toward the line
             cog = (math.degrees(angle) + 180) % 360 + random.uniform(-5, 5)
 
             positions.append(
@@ -169,7 +171,6 @@ class SyntheticGenerator:
         return positions
 
     def generate_gate_metrics(self) -> tuple[list[GateMetricEntry], list[GateAlert]]:
-        """Generate gate metrics for all athletes."""
         elapsed_s = time.time() - self._t0
         metrics: list[GateMetricEntry] = []
         alerts: list[GateAlert] = []
@@ -179,7 +180,6 @@ class SyntheticGenerator:
             speed_mps = state["speed_kn"] / 1.94384
             dist_m = state["initial_dist_m"] - speed_mps * elapsed_s
 
-            # Determine status
             crossing_event = CrossingEvent.NO_CROSSING
             if dist_m <= 0 and not state["crossed"]:
                 crossing_event = CrossingEvent.CROSSING_LEFT
@@ -236,7 +236,6 @@ class SessionPackReplayer:
         self._meta: dict = {}
 
     def load(self) -> None:
-        """Load and parse the session pack file."""
         with open(self._path, "r", encoding="utf-8") as fh:
             for line in fh:
                 line = line.strip()
@@ -255,11 +254,6 @@ class SessionPackReplayer:
         )
 
     async def replay(self, broadcast_fn) -> None:
-        """Replay messages with timing based on ts_ms offsets.
-
-        Args:
-            broadcast_fn: Async function to broadcast a JSON string.
-        """
         if not self._messages:
             logger.warning("No messages to replay")
             return
@@ -268,14 +262,12 @@ class SessionPackReplayer:
         start_wall = time.time()
 
         for msg in self._messages:
-            # Compute delay from the offset
             msg_offset_ms = msg.get("ts_ms", 0) - base_ts
             target_wall = start_wall + msg_offset_ms / 1000.0
             delay = target_wall - time.time()
             if delay > 0:
                 await asyncio.sleep(delay)
 
-            # Override timestamps with current wall clock
             msg["ts_ms"] = int(time.time() * 1000)
             msg["seq"] = _next_seq()
             await broadcast_fn(json.dumps(msg))
@@ -288,7 +280,6 @@ class SessionPackReplayer:
 # ---------------------------------------------------------------------------
 
 async def _broadcast(text: str) -> None:
-    """Broadcast text to all connected WebSocket clients."""
     global _messages_sent
     disconnected = []
     for ws in _clients:
@@ -300,6 +291,9 @@ async def _broadcast(text: str) -> None:
         if ws in _clients:
             _clients.remove(ws)
     _messages_sent += 1
+    # Record if recording
+    if _recording:
+        _recorder.record(text)
 
 
 # ---------------------------------------------------------------------------
@@ -307,7 +301,6 @@ async def _broadcast(text: str) -> None:
 # ---------------------------------------------------------------------------
 
 async def _synthetic_loop() -> None:
-    """Generate and broadcast synthetic data at ~10 Hz."""
     gen = SyntheticGenerator()
 
     # Send start-line definition first
@@ -377,7 +370,6 @@ async def _synthetic_loop() -> None:
 
 
 async def _heartbeat_loop() -> None:
-    """Send heartbeat every 5 seconds."""
     while True:
         await asyncio.sleep(5.0)
         if not _clients:
@@ -400,12 +392,11 @@ async def _heartbeat_loop() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Routes
+# Routes — WebSocket
 # ---------------------------------------------------------------------------
 
 @app.websocket("/ws")
 async def ws_endpoint(websocket: WebSocket) -> None:
-    """WebSocket endpoint matching the relay contract."""
     await websocket.accept()
     _clients.append(websocket)
     logger.info("Client connected. Total: %d", len(_clients))
@@ -420,9 +411,19 @@ async def ws_endpoint(websocket: WebSocket) -> None:
         logger.info("Client disconnected. Total: %d", len(_clients))
 
 
+# ---------------------------------------------------------------------------
+# Routes — HTTP API
+# ---------------------------------------------------------------------------
+
 @app.get("/api/health")
 async def health() -> dict:
-    return {"status": "healthy", "mode": "mock", "clients": len(_clients)}
+    return {
+        "status": "healthy",
+        "mode": "mock",
+        "clients": len(_clients),
+        "recording": _recording,
+        "recording_session": _recorder.session_id if _recording else None,
+    }
 
 
 @app.get("/api/athletes")
@@ -430,9 +431,92 @@ async def athletes() -> dict:
     return {"athletes": MOCK_ATHLETES}
 
 
+# --- Session management ---
+
 @app.get("/api/sessions")
-async def sessions() -> dict:
-    return {"sessions": []}
+async def list_sessions() -> dict:
+    sessions = _recorder.list_sessions()
+    return {"sessions": sessions}
+
+
+@app.get("/api/sessions/{session_id}")
+async def get_session(session_id: str) -> dict:
+    meta = _recorder.get_session(session_id)
+    if meta is None:
+        return JSONResponse(
+            status_code=404,
+            content={"error": f"Session '{session_id}' not found"},
+        )
+    return meta
+
+
+@app.post("/api/sessions/start")
+async def start_session(session_id: str | None = None) -> dict:
+    global _recording, _session_id
+    sid = _recorder.start_session(session_id)
+    _recording = True
+    _session_id = sid
+    return {"status": "recording", "session_id": sid}
+
+
+@app.post("/api/sessions/stop")
+async def stop_session() -> dict:
+    global _recording, _session_id
+    meta = _recorder.stop_session()
+    _recording = False
+    _session_id = "MOCK-SESSION"
+    if meta is None:
+        return {"status": "not_recording"}
+    return {"status": "stopped", **meta}
+
+
+# --- Replay data ---
+
+@app.get("/api/sessions/{session_id}/messages")
+async def get_session_messages(session_id: str) -> dict:
+    messages = _recorder.get_session_messages(session_id)
+    if not messages:
+        return JSONResponse(
+            status_code=404,
+            content={"error": f"No messages found for session '{session_id}'"},
+        )
+    return {"session_id": session_id, "count": len(messages), "messages": messages}
+
+
+# --- Export ---
+
+@app.get("/api/sessions/{session_id}/export", response_model=None)
+async def export_session(
+    session_id: str,
+    format: str = Query(default="json", pattern="^(csv|json)$"),
+):
+    if format == "csv":
+        csv_str = _recorder.export_csv(session_id)
+        if csv_str is None:
+            return JSONResponse(
+                status_code=404,
+                content={"error": f"No data for session '{session_id}'"},
+            )
+        return PlainTextResponse(
+            content=csv_str,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f'attachment; filename="{session_id}.csv"'
+            },
+        )
+    else:
+        messages = _recorder.get_session_messages(session_id)
+        if not messages:
+            return JSONResponse(
+                status_code=404,
+                content={"error": f"No data for session '{session_id}'"},
+            )
+        return JSONResponse(
+            content={"session_id": session_id, "messages": messages},
+            headers={
+                "Content-Disposition": f'attachment; filename="{session_id}.json"'
+            },
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -460,7 +544,6 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8000)
     args = parser.parse_args()
 
-    # Start background tasks based on mode using lifespan
     from contextlib import asynccontextmanager
 
     if args.pack:

@@ -1,18 +1,21 @@
 """FastAPI entry point for the relay/bridge service.
 
 Bridges HKSI_Pos ZMQ streams to WebSocket for the Coach Monitor UI.
+Phase 2: adds session recording, replay API, and export API.
 """
 
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import time
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from relay.athlete_registry import AthleteRegistry
@@ -41,6 +44,7 @@ from relay.models import (
     AnchorPoint,
     WSMessage,
 )
+from relay.session_recorder import SessionRecorder
 from relay.sog_cog import SogCogManager
 from relay.status_classifier import StatusClassifier
 from relay.ws_manager import WSConnectionManager
@@ -68,6 +72,7 @@ classifier = StatusClassifier(
     stale_threshold_s=settings.threshold_stale_s,
 )
 ws_manager = WSConnectionManager()
+recorder = SessionRecorder(settings.session_data_dir)
 
 # ZMQ subscribers (initialized on startup)
 zmq_position_sub: ZMQSubscriber | None = None
@@ -90,6 +95,16 @@ def _next_seq() -> int:
     global _seq
     _seq += 1
     return _seq
+
+
+# ---------------------------------------------------------------------------
+# Broadcast helper (also records to session)
+# ---------------------------------------------------------------------------
+
+async def _broadcast_and_record(json_str: str) -> None:
+    """Broadcast message to WS clients and record if session active."""
+    await ws_manager.broadcast_text(json_str)
+    recorder.record(json_str)
 
 
 # ---------------------------------------------------------------------------
@@ -153,7 +168,7 @@ async def _on_position_message(topic: str, payload: str) -> None:
             session_id=_session_id,
             payload=PositionUpdatePayload(positions=positions),
         )
-        await ws_manager.broadcast_text(msg.to_json_str())
+        await _broadcast_and_record(msg.to_json_str())
         _messages_relayed += 1
 
 
@@ -247,7 +262,7 @@ async def _on_gate_message(topic: str, payload: str) -> None:
                 },
             ),
         )
-        await ws_manager.broadcast_text(event_msg.to_json_str())
+        await _broadcast_and_record(event_msg.to_json_str())
         _messages_relayed += 1
 
     if metrics:
@@ -258,19 +273,12 @@ async def _on_gate_message(topic: str, payload: str) -> None:
             session_id=_session_id,
             payload=GateMetricsPayload(metrics=metrics, alerts=alerts),
         )
-        await ws_manager.broadcast_text(msg.to_json_str())
+        await _broadcast_and_record(msg.to_json_str())
         _messages_relayed += 1
 
 
 def _tag_id_to_device_id(tag_id: str) -> int:
-    """Convert a tag string like 'T0' to device_id 1.
-
-    Args:
-        tag_id: Tag identifier string (e.g., "T0", "T1", ...).
-
-    Returns:
-        Numeric device_id (T0=1, T1=2, ...).
-    """
+    """Convert a tag string like 'T0' to device_id 1."""
     try:
         idx = int(tag_id.replace("T", ""))
         return idx + 1
@@ -364,6 +372,8 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
     # Shutdown
     logger.info("Relay service shutting down...")
     heartbeat.cancel()
+    if recorder.is_recording:
+        recorder.stop_session()
     if zmq_position_sub:
         zmq_position_sub.stop()
     if zmq_gate_sub:
@@ -376,7 +386,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator:
 
 app = FastAPI(
     title="HKSI Coach Monitor Relay",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -399,10 +409,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
     await ws_manager.connect(websocket)
     try:
         while True:
-            # Keep connection alive; handle client messages if any
             data = await websocket.receive_text()
-            # Currently we ignore client messages, but could handle
-            # start_signal, session controls, etc. in the future
             logger.debug("Received client message: %s", data[:100])
     except WebSocketDisconnect:
         ws_manager.disconnect(websocket)
@@ -411,7 +418,7 @@ async def websocket_endpoint(websocket: WebSocket) -> None:
 
 
 # ---------------------------------------------------------------------------
-# HTTP endpoints
+# HTTP endpoints — health & athletes
 # ---------------------------------------------------------------------------
 
 @app.get("/api/health")
@@ -430,6 +437,8 @@ async def health() -> dict:
         "athletes_registered": registry.count,
         "messages_relayed": _messages_relayed,
         "parser_counters": get_parser_counters(),
+        "recording": recorder.is_recording,
+        "recording_session": recorder.session_id,
     }
 
 
@@ -450,10 +459,102 @@ async def list_athletes() -> dict:
     }
 
 
+# ---------------------------------------------------------------------------
+# HTTP endpoints — session management
+# ---------------------------------------------------------------------------
+
 @app.get("/api/sessions")
 async def list_sessions() -> dict:
-    """List available sessions (stub for Phase 0)."""
-    return {"sessions": []}
+    """List all available sessions."""
+    sessions = recorder.list_sessions()
+    return {"sessions": sessions}
+
+
+@app.get("/api/sessions/{session_id}")
+async def get_session(session_id: str) -> dict:
+    """Get metadata for a specific session."""
+    meta = recorder.get_session(session_id)
+    if meta is None:
+        return JSONResponse(
+            status_code=404,
+            content={"error": f"Session '{session_id}' not found"},
+        )
+    return meta
+
+
+@app.post("/api/sessions/start")
+async def start_session(session_id: str | None = None) -> dict:
+    """Start recording a new session."""
+    global _session_id
+    sid = recorder.start_session(session_id)
+    _session_id = sid
+    return {"status": "recording", "session_id": sid}
+
+
+@app.post("/api/sessions/stop")
+async def stop_session() -> dict:
+    """Stop the current recording session."""
+    global _session_id
+    meta = recorder.stop_session()
+    _session_id = None
+    if meta is None:
+        return {"status": "not_recording"}
+    return {"status": "stopped", **meta}
+
+
+# ---------------------------------------------------------------------------
+# HTTP endpoints — replay data
+# ---------------------------------------------------------------------------
+
+@app.get("/api/sessions/{session_id}/messages")
+async def get_session_messages(session_id: str) -> dict:
+    """Get all messages for a session (for client-side replay)."""
+    messages = recorder.get_session_messages(session_id)
+    if not messages:
+        return JSONResponse(
+            status_code=404,
+            content={"error": f"No messages found for session '{session_id}'"},
+        )
+    return {"session_id": session_id, "count": len(messages), "messages": messages}
+
+
+# ---------------------------------------------------------------------------
+# HTTP endpoints — export
+# ---------------------------------------------------------------------------
+
+@app.get("/api/sessions/{session_id}/export", response_model=None)
+async def export_session(
+    session_id: str,
+    format: str = Query(default="json", pattern="^(csv|json)$"),
+):
+    """Export session data as CSV or JSON."""
+    if format == "csv":
+        csv_str = recorder.export_csv(session_id)
+        if csv_str is None:
+            return JSONResponse(
+                status_code=404,
+                content={"error": f"No data for session '{session_id}'"},
+            )
+        return PlainTextResponse(
+            content=csv_str,
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": f'attachment; filename="{session_id}.csv"'
+            },
+        )
+    else:
+        messages = recorder.get_session_messages(session_id)
+        if not messages:
+            return JSONResponse(
+                status_code=404,
+                content={"error": f"No data for session '{session_id}'"},
+            )
+        return JSONResponse(
+            content={"session_id": session_id, "messages": messages},
+            headers={
+                "Content-Disposition": f'attachment; filename="{session_id}.json"'
+            },
+        )
 
 
 # ---------------------------------------------------------------------------
