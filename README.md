@@ -6,6 +6,19 @@ Displays live athlete positions, gate metrics, and start-line status from the [H
 
 ---
 
+## Public Access
+
+The frontend is publicly accessible via two entry points:
+
+| URL | Mode | Description |
+|-----|------|-------------|
+| **http://8.135.39.47:8000/** | Production | Built frontend served by the relay/mock server (single service, recommended) |
+| **http://8.135.39.47:3000/** | Development | Vite dev server with hot-reload (proxies API/WS to port 8000) |
+
+Both bind to `0.0.0.0` and are reachable from any network client.
+
+---
+
 ## Architecture
 
 ```
@@ -14,20 +27,20 @@ HKSI_Pos (ZMQ PUB :5000/:5001)
     ┌───────┴───────┐
     │  Relay Service │   Python / FastAPI / pyzmq
     │  (port 8000)   │   ZMQ SUB → transform → WebSocket
+    │                │   + serves built frontend (production)
     └───────┬───────┘
-            │ WebSocket + REST API
+            │ WebSocket + REST API + static files
     ┌───────┴───────┐
     │  Frontend UI   │   React / TypeScript / Vite
-    │  (port 3000)   │   Leaflet map + ranking board
+    │  (port 3000)   │   Leaflet map + ranking board (dev mode)
     └───────────────┘
 ```
 
-| Component | Stack | Port |
-|-----------|-------|------|
-| **Relay Service** | Python 3.10+, FastAPI, Uvicorn, pyzmq | `8000` |
-| **Mock Server** | Same as Relay (synthetic or session-pack data) | `8000` |
-| **Frontend Dev Server** | Node.js 20+, Vite, React 19, TypeScript | `3000` |
-| **HKSI_Pos** (upstream) | C++ / ZMQ PUB | `5000`, `5001` |
+| Component | Stack | Port | Public |
+|-----------|-------|------|--------|
+| **Relay / Mock Server** | Python 3.10+, FastAPI, Uvicorn, pyzmq | `8000` | Yes (`0.0.0.0`) |
+| **Frontend Dev Server** | Node.js 20+, Vite, React 19, TypeScript | `3000` | Yes (`0.0.0.0`) |
+| **HKSI_Pos** (upstream) | C++ / ZMQ PUB | `5000`, `5001` | No (internal) |
 
 ---
 
@@ -58,7 +71,7 @@ The mock server generates synthetic data for 25 athletes, serving the same WebSo
 python3 -m relay.mock_server
 ```
 
-This starts at `http://localhost:8000`. Options:
+This starts at **http://8.135.39.47:8000** (publicly accessible). If the frontend has been built (`npm run build`), the full UI is served from this single port. Options:
 
 ```bash
 # Replay a recorded session pack instead of synthetic data
@@ -75,7 +88,7 @@ cd frontend
 npm run dev
 ```
 
-Open **http://localhost:3000** in a browser. The Vite dev server proxies `/ws` and `/api` to `localhost:8000`.
+Open **http://8.135.39.47:3000** in a browser. The Vite dev server binds to `0.0.0.0` (publicly accessible) and proxies `/ws` and `/api` to `localhost:8000`.
 
 ### 4. Start the Real Relay Service (requires HKSI_Pos)
 
@@ -101,7 +114,7 @@ cd frontend
 npm run build
 ```
 
-The built files go to `frontend/dist/`. The mock server and relay both auto-serve this directory if it exists, making the full app available at `http://localhost:8000`.
+The built files go to `frontend/dist/`. The mock server and relay both auto-serve this directory if it exists, making the full app available at **http://8.135.39.47:8000** — no separate dev server needed.
 
 ---
 
@@ -111,7 +124,7 @@ The built files go to `frontend/dist/`. The mock server and relay both auto-serv
 
 | Endpoint | Description |
 |----------|-------------|
-| `ws://localhost:8000/ws` | Real-time data stream (relay or mock) |
+| `ws://8.135.39.47:8000/ws` | Real-time data stream (relay or mock) |
 
 Broadcasts 6 message types: `position_update`, `gate_metrics`, `start_line_definition`, `device_health`, `event`, `heartbeat`. See `docs/WS_MESSAGE_SCHEMA.md` for the full contract.
 
