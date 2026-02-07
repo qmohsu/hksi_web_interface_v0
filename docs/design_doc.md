@@ -1,7 +1,7 @@
 # UI Design Document — Start-Gate Coach Monitor Web Interface
 
 - **Version:** v0.2
-- **Owner:** (Your name)
+- **Owner:** (Li-Ta Hsu)
 - **Audience:** Raspberry Pi engineers, Web/UI engineers, Server engineers, Coaches/Stakeholders
 - **Last updated:** 2026-02-07
 
