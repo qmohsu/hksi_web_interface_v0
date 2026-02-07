@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+/* Leaflet CSS import */
+@import "leaflet/dist/leaflet.css";
+
+/* Base styles for field-usable UI: high contrast, large touch targets */
+:root {
+  --color-safe: #22c55e;
+  --color-approaching: #eab308;
+  --color-risk: #f97316;
+  --color-crossed: #ef4444;
+  --color-ocs: #dc2626;
+  --color-stale: #9ca3af;
+}
+
+body {
+  margin: 0;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Ensure leaflet container gets proper height */
+.leaflet-container {
+  width: 100%;
+  height: 100%;
+}

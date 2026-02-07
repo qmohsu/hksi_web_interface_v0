@@ -11,19 +11,11 @@ This UI project implements the "Coach Monitor terminals" portion of the integrat
 
 Real-time coaching display of athletes near the start line and key metrics.
 
-HKSI_SRFS_presentation_20260123…
-
 Automated indicators such as trajectories, segment/lap times, speed profiles.
-
-Final SRFS Application Form_260…
 
 Session replay and data export for coaching workflows.
 
-Final SRFS Application Form_260…
-
 Operational tooling (device status, link quality, battery reporting) to support daily use.
-
-Final SRFS Application Form_260…
 
 This UI design is also aligned with stakeholder expectations shown in the reference GUI screenshot:
 
@@ -42,31 +34,21 @@ Distance-to-line, time-to-line, speed, heading
 
 Start status and alerts (e.g., "Risk", "OCS", "Crossed", "Safe")
 
-HKSI_SRFS_presentation_20260123…
-
 Replay and review
 
 Post-session replay with timeline controls
 
 Exportable datasets for performance review
 
-HKSI_SRFS_presentation_20260123…
-
 Operational confidence
 
 Device status/health panel (anchors, tags, gateways): battery, link quality, dropouts, time sync health
-
-Final SRFS Application Form_260…
 
 2.2 Engineering goals
 
 Stable interface contract (data schema + APIs) to unblock Raspberry Pi and Web engineers.
 
-Final SRFS Application Form_260…
-
 Meets measurable performance targets (latency, reliability, scalability).
-
-Final SRFS Application Form_260…
 
 3. Non-goals (out of scope for this UI MVP)
 
@@ -260,8 +242,6 @@ Last seen time
 Time sync health indicator
 
 This supports the program's emphasis on device resilience and monitoring.
-
-Final SRFS Application Form_260…
 
 6.5 Settings screen
 
@@ -640,19 +620,11 @@ Use these as acceptance criteria:
 
 Time sync alignment within 100 ms (system-level).
 
-Final SRFS Application Form_260…
-
 End-to-end "tag → coach display" latency within 0.5–2.0 s (includes HKSI_Pos processing + relay + WebSocket + UI render).
-
-Final SRFS Application Form_260…
 
 Session uptime ≥95–98%, packet loss ≤2–5% (logged).
 
-Final SRFS Application Form_260…
-
 Support at least 25 athletes and 1 coach terminal.
-
-Final SRFS Application Form_260…
 
 Relay service must add < 50 ms latency on top of HKSI_Pos output.
 
@@ -660,8 +632,6 @@ Relay service must add < 50 ms latency on top of HKSI_Pos output.
 9.1 Why we need demo mode
 
 Demo mode lets you show the UI end-to-end even before Raspberry Pi and live gateway integration is ready. It also validates replay/export flows early (which are required deliverables).
-
-HKSI_SRFS_presentation_20260123…
 
 9.2 Demo mode features (minimum)
 
@@ -703,15 +673,9 @@ If Raspberry Pi engineers are ingesting raw UWB output from LD150(-I), note:
 
 Serial uplink uses 115200bps-8-n-1, with mc messages containing range fields (mm) and an internal timestamp RANGTIME in ms.
 
-LD150(-I)_UserManual
-
 LD150(-I) spec includes data update frequency 100Hz (MAX) and ranging accuracy ±5cm (device-side).
 
-LD150(-I)_UserManual
-
 TTL serial wiring guidance: TX→RX, GND→GND.
-
-LD150(-I)_UserManual
 
 UI implication: we should not render at 100 Hz; UI should throttle/smooth (e.g., 5–10 Hz rendering) while keeping full-rate data stored server-side if needed.
 
@@ -730,8 +694,6 @@ export attempts and success/fail
 Server should provide:
 
 packet loss metrics and dropout counts per device (for Devices screen).
-
-Final SRFS Application Form_260…
 
 12. Open questions / decisions to lock with engineers
 

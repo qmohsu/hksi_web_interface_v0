@@ -9,13 +9,9 @@ Last updated: 2026-02-07
 
 Freeze interfaces early (schema/APIs/time semantics) to remove cross-team blockers.
 
-Final SRFS Application Form_260…
-
 Ship a demo-first vertical slice: live board + map + replay using simulated data so you can demonstrate readiness even before hardware connections.
 
 Build around measurable targets: latency, uptime, scalability.
-
-Final SRFS Application Form_260…
 
 **Integrate with HKSI_Pos via relay/bridge.** The centralized positioning server ([HKSI_Pos](https://github.com/IPNL-POLYU/HKSI_Pos)) publishes position and gate metrics via ZMQ. A relay service is required to bridge ZMQ → WebSocket for the browser UI. This relay also handles message transformation, athlete mapping, SOG/COG computation, status classification, and session management (see Epic G and Design Doc Section 8).
 
@@ -57,8 +53,6 @@ Acceptance criteria
 
 Supports 25 athletes with smooth rendering (UI throttled)
 
-Final SRFS Application Form_260…
-
 Shows "data age" and connection status
 
 Epic C — Start metrics + alerting
@@ -74,8 +68,6 @@ Alerts panel + toast notifications + acknowledgment
 Acceptance criteria
 
 Alerts appear within the real-time latency budget (end-to-end target).
-
-Final SRFS Application Form_260…
 
 Status classification matches the canonical enum in Design Doc Section 7.4
 
@@ -95,8 +87,6 @@ Replay works on a saved session pack (same pipeline as live)
 
 Export generates within the operational KPI (≤2–5 minutes post-session target is system-level; UI must support the workflow).
 
-Final SRFS Application Form_260…
-
 Epic E — Devices & health
 
 Deliverables
@@ -113,8 +103,6 @@ Acceptance criteria
 
 Device health updates live and is auditable via logs.
 
-Final SRFS Application Form_260…
-
 Epic F — Security & access (if needed for current phase)
 
 Deliverables
@@ -126,8 +114,6 @@ Access logging hooks (server side)
 Acceptance criteria
 
 Meets "role-based access control with data-privacy handling" direction at system level.
-
-Final SRFS Application Form_260…
 
 Epic G — Relay/Bridge service (NEW — critical integration layer)
 
@@ -269,11 +255,7 @@ If using LD150(-I):
 
 confirm parsing mc ranges + timestamp usage (RANGTIME ms)
 
-LD150(-I)_UserManual
-
 confirm rate limits / downsampling strategy (100Hz max at device)
-
-LD150(-I)_UserManual
 
 From web interface engineers
 
@@ -292,11 +274,7 @@ Use scenario packs to validate:
 
 Dropouts (simulate packet loss 2–5% and brief disconnects)
 
-Final SRFS Application Form_260…
-
 Latency injection to verify UI still communicates "data age" correctly
-
-Final SRFS Application Form_260…
 
 Start events: normal, late start, OCS
 
@@ -344,8 +322,6 @@ UI remains usable in bright outdoor conditions (contrast, large fonts, touch tar
 
 Export and replay demonstrably work (required deliverables)
 
-HKSI_SRFS_presentation_20260123…
-
 6. Definition of Done (DoD)
 
 A feature is "Done" when:
@@ -382,15 +358,9 @@ Known integration dependencies list (what you're waiting for from HKSI_Pos / Pi 
 
 SRFS application form:
 
-Final SRFS Application Form_260…
-
 SRFS project presentation:
 
-HKSI_SRFS_presentation_20260123…
-
 LD150(-I) manual:
-
-LD150(-I)_UserManual
 
 HKSI_Pos centralized positioning server:
 

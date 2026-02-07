@@ -1,0 +1,29 @@
+{
+  "athletes": [
+    { "device_id": 1, "athlete_id": "T00", "name": "CHAN SIU MING", "team": "HKG" },
+    { "device_id": 2, "athlete_id": "T01", "name": "WONG KA HO", "team": "HKG" },
+    { "device_id": 3, "athlete_id": "T02", "name": "LEE SONGHA", "team": "HKG" },
+    { "device_id": 4, "athlete_id": "T03", "name": "LAM HOI YAN", "team": "HKG" },
+    { "device_id": 5, "athlete_id": "T04", "name": "CHEUNG WAI KIT", "team": "HKG" },
+    { "device_id": 6, "athlete_id": "T05", "name": "NG CHI FUNG", "team": "HKG" },
+    { "device_id": 7, "athlete_id": "T06", "name": "TSANG YIK HEI", "team": "HKG" },
+    { "device_id": 8, "athlete_id": "T07", "name": "HO MAN WAI", "team": "HKG" },
+    { "device_id": 9, "athlete_id": "T08", "name": "YIP CHUN HIM", "team": "HKG" },
+    { "device_id": 10, "athlete_id": "T09", "name": "FUNG KA LONG", "team": "HKG" },
+    { "device_id": 11, "athlete_id": "T10", "name": "LEUNG PAK YIN", "team": "HKG" },
+    { "device_id": 12, "athlete_id": "T11", "name": "CHENG WING YAN", "team": "HKG" },
+    { "device_id": 13, "athlete_id": "T12", "name": "TANG SZE WING", "team": "HKG" },
+    { "device_id": 14, "athlete_id": "T13", "name": "LUI TSZ CHING", "team": "HKG" },
+    { "device_id": 15, "athlete_id": "T14", "name": "MAK YEE TING", "team": "HKG" },
+    { "device_id": 16, "athlete_id": "T15", "name": "KWOK HIN WAH", "team": "HKG" },
+    { "device_id": 17, "athlete_id": "T16", "name": "AU YEUNG TSZ KIN", "team": "HKG" },
+    { "device_id": 18, "athlete_id": "T17", "name": "SIN KA YAN", "team": "HKG" },
+    { "device_id": 19, "athlete_id": "T18", "name": "POON SZE MAN", "team": "HKG" },
+    { "device_id": 20, "athlete_id": "T19", "name": "LAU WING TUNG", "team": "HKG" },
+    { "device_id": 21, "athlete_id": "T20", "name": "CHOW HOI CHING", "team": "HKG" },
+    { "device_id": 22, "athlete_id": "T21", "name": "IP KA MAN", "team": "HKG" },
+    { "device_id": 23, "athlete_id": "T22", "name": "SO TSZ YIN", "team": "HKG" },
+    { "device_id": 24, "athlete_id": "T23", "name": "YUEN WING LAM", "team": "HKG" },
+    { "device_id": 25, "athlete_id": "T24", "name": "CHAN TSZ HIN", "team": "HKG" }
+  ]
+}
