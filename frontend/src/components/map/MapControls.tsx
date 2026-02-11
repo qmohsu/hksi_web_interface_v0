@@ -66,6 +66,15 @@ export function MapControls() {
               />
               Follow selected
             </label>
+            <label className="flex items-center gap-2 text-xs text-slate-700 cursor-pointer mt-1">
+              <input
+                type="checkbox"
+                checked={mapControls.autoFitBounds}
+                onChange={(e) => setMapControl('autoFitBounds', e.target.checked)}
+                className="accent-blue-500 w-3.5 h-3.5"
+              />
+              Auto fit start line
+            </label>
           </section>
 
           {/* Track tail length */}

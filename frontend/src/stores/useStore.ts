@@ -79,6 +79,7 @@ export interface MapControls {
   showLabels: boolean;
   followSelected: boolean;
   trackTailSeconds: number; // 0 = all, otherwise last N seconds
+  autoFitBounds: boolean;   // auto adjust map view when start line changes
 }
 
 // ---------------------------------------------------------------------------
@@ -181,6 +182,7 @@ export const useStore = create<AppState>((set) => ({
     showLabels: true,
     followSelected: false,
     trackTailSeconds: 0,
+    autoFitBounds: true,  // default: auto adjust enabled
   },
   wind: null,
   measurement: {

@@ -93,6 +93,7 @@ export function MapView() {
   const athletes = useStore((s) => s.athletes);
   const startLine = useStore((s) => s.startLine);
   const mapControls = useStore((s) => s.mapControls);
+  const autoFitBounds = useStore((s) => s.mapControls.autoFitBounds);
   const measurement = useStore((s) => s.measurement);
   const setMeasurement = useStore((s) => s.setMeasurement);
 
@@ -263,8 +264,10 @@ export function MapView() {
         .addTo(map),
     ];
 
-    map.fitBounds(L.latLngBounds(left, right).pad(0.5));
-  }, [startLine]);
+    if (autoFitBounds) {
+      map.fitBounds(L.latLngBounds(left, right).pad(0.5));
+    }
+  }, [startLine, autoFitBounds]);
 
   // ---------------------------------------------------------------------------
   // Update athlete markers, labels, and tracks
