@@ -97,6 +97,9 @@ export function MapView() {
   const measurement = useStore((s) => s.measurement);
   const setMeasurement = useStore((s) => s.setMeasurement);
 
+  // Track map instance to trigger re-render when map is ready
+  const [mapReady, setMapReady] = useState(false);
+
   // ---------------------------------------------------------------------------
   // Initialize map
   // ---------------------------------------------------------------------------
@@ -277,9 +280,6 @@ export function MapView() {
   const athleteList = useMemo(() => Object.values(athletes), [athletes]);
   const anySelected = useMemo(() => athleteList.some((a) => a.selected), [athleteList]);
   const selectedAthlete = useMemo(() => athleteList.find((a) => a.selected) ?? null, [athleteList]);
-
-  // Track map instance to trigger re-render when map is ready
-  const [mapReady, setMapReady] = useState(false);
 
   useEffect(() => {
     const map = mapRef.current;
