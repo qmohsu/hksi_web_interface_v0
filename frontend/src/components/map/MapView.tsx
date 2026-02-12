@@ -12,7 +12,7 @@
  * - Measurement tool (click-to-measure bearing + distance)
  */
 
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
 import L from 'leaflet';
 import { useStore } from '../../stores/useStore';
 import { MapControls } from './MapControls';
@@ -158,10 +158,12 @@ export function MapView() {
     minimapRef.current = minimapCtrl;
 
     mapRef.current = map;
+    setMapReady(true);
 
     return () => {
       map.remove();
       mapRef.current = null;
+      setMapReady(false);
     };
   }, []);
 
@@ -276,6 +278,9 @@ export function MapView() {
   const anySelected = useMemo(() => athleteList.some((a) => a.selected), [athleteList]);
   const selectedAthlete = useMemo(() => athleteList.find((a) => a.selected) ?? null, [athleteList]);
 
+  // Track map instance to trigger re-render when map is ready
+  const [mapReady, setMapReady] = useState(false);
+
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
@@ -383,7 +388,7 @@ export function MapView() {
         }
       }
     }
-  }, [athleteList, anySelected, mapControls.showTracks, mapControls.showLabels, mapControls.trackTailSeconds]);
+  }, [athleteList, anySelected, mapControls.showTracks, mapControls.showLabels, mapControls.trackTailSeconds, mapReady]);
 
   // ---------------------------------------------------------------------------
   // Camera follow selected athlete
