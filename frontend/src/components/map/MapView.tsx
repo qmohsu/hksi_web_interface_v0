@@ -195,7 +195,7 @@ export function MapView() {
 
     map.on('click', onClick);
     return () => { map.off('click', onClick); };
-  }, [measurement.active, measurement.startLatLon, measurement.endLatLon, setMeasurement]);
+  }, [measurement.active, measurement.startLatLon, measurement.endLatLon, setMeasurement, mapReady]);
 
   // Draw measurement line
   useEffect(() => {
@@ -234,7 +234,7 @@ export function MapView() {
           .addTo(map),
       ];
     }
-  }, [measurement.startLatLon, measurement.endLatLon, measurement.distance_m, measurement.bearing_deg]);
+  }, [measurement.startLatLon, measurement.endLatLon, measurement.distance_m, measurement.bearing_deg, mapReady]);
 
   // ---------------------------------------------------------------------------
   // Update start line
@@ -269,7 +269,7 @@ export function MapView() {
     if (autoFitBounds) {
       map.fitBounds(L.latLngBounds(left, right).pad(0.5));
     }
-  }, [startLine, autoFitBounds]);
+  }, [startLine, autoFitBounds, mapReady]);
 
   // ---------------------------------------------------------------------------
   // Update athlete markers, labels, and tracks
