@@ -116,6 +116,7 @@ export function MapView() {
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '&copy; OSM',
       maxZoom: 20,
+      maxNativeZoom: 19, // Above zoom 19, tiles from level 19 are upscaled instead of showing gray
     }).addTo(map);
 
     // Minimap: small overview in bottom-left
