@@ -37,8 +37,8 @@ export function AlertsPanel() {
   return (
     <div className="bg-white rounded-lg shadow border border-slate-200 overflow-hidden">
       {/* Header */}
-      <button
-        className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors"
+      <div
+        className="w-full flex items-center justify-between px-3 py-2 bg-slate-50 hover:bg-slate-100 transition-colors cursor-pointer"
         onClick={() => setExpanded(!expanded)}
       >
         <div className="flex items-center gap-2">
@@ -65,7 +65,7 @@ export function AlertsPanel() {
           )}
           <span className="text-slate-400 text-xs">{expanded ? '\u25B2' : '\u25BC'}</span>
         </div>
-      </button>
+      </div>
 
       {/* Event list */}
       {expanded && (
