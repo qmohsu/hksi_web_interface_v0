@@ -121,6 +121,11 @@ export class ReplayEngine {
         error: null,
       };
       this.emit();
+
+      // Replay all messages to rebuild initial state in the store
+      for (let i = 0; i < this.messages.length; i++) {
+        this.onMessage(this.messages[i] as unknown as WSMessage);
+      }
     } catch (e) {
       this.state = {
         ...this.state,

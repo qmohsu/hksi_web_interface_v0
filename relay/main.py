@@ -15,10 +15,11 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import AsyncGenerator
 
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import PlainTextResponse, JSONResponse
+from fastapi.responses import PlainTextResponse, JSONResponse, FileResponse
 from fastapi.staticfiles import StaticFiles
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from relay.athlete_registry import AthleteRegistry
 from relay.config import RelaySettings, get_settings
@@ -624,6 +625,23 @@ async def export_session(
 _frontend_dist = Path(__file__).parent.parent / "frontend" / "dist"
 if _frontend_dist.exists():
     app.mount("/", StaticFiles(directory=str(_frontend_dist), html=True), name="frontend")
+
+
+# ---------------------------------------------------------------------------
+# SPA catch-all: return index.html for non-API routes (to support client-side routing)
+# ---------------------------------------------------------------------------
+
+@app.exception_handler(StarletteHTTPException)
+async def spa_exception_handler(request: Request, exc: StarletteHTTPException) -> JSONResponse | FileResponse:
+    """Handle 404 errors for SPA: return index.html for frontend routes."""
+    if exc.status_code == 404:
+        path = request.url.path
+        # Only handle non-API, non-WebSocket routes
+        if not path.startswith("/api/") and path != "/ws" and not path.startswith("/assets/"):
+            index_file = _frontend_dist / "index.html"
+            if index_file.exists():
+                return FileResponse(index_file)
+    return JSONResponse({"detail": exc.detail}, status_code=exc.status_code)
 
 
 # ---------------------------------------------------------------------------

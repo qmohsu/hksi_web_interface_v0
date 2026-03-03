@@ -26,7 +26,6 @@ const STATUS_INDICATOR: Record<string, string> = {
 
 export function Header() {
   const connectionStatus = useStore((s) => s.connectionStatus);
-  const sessionId = useStore((s) => s.sessionId);
   const heartbeat = useStore((s) => s.heartbeat);
   const [now, setNow] = useState(Date.now());
 
@@ -43,9 +42,6 @@ export function Header() {
         <h1 className="text-lg font-bold tracking-tight">
           HKSI Coach Monitor
         </h1>
-        <span className="text-xs px-2 py-0.5 rounded bg-slate-700 font-mono">
-          {sessionId ?? 'NO SESSION'}
-        </span>
         <div className="flex items-center gap-1.5">
           <span
             className={`inline-block w-2.5 h-2.5 rounded-full ${STATUS_INDICATOR[connectionStatus]}`}

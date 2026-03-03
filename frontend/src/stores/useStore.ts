@@ -142,6 +142,9 @@ interface AppState {
   // Measurement tool
   measurement: MeasurementState;
 
+  // Live mode — when false, live stream messages are ignored (for replay)
+  liveMode: boolean;
+
   // Actions
   setConnectionStatus: (s: ConnectionStatus) => void;
   handleMessage: (msg: WSMessage) => void;
@@ -153,6 +156,8 @@ interface AppState {
   setWind: (wind: WindData | null) => void;
   setMeasurement: (m: Partial<MeasurementState>) => void;
   clearMeasurement: () => void;
+  setLiveMode: (enabled: boolean) => void;
+  resetState: () => void;
 }
 
 /** Compute rolling average SOG from track points within the window. */
@@ -164,16 +169,16 @@ function computeAvgSog(track: TrackPoint[], now: number): number | null {
   return Math.round((sum / recent.length) * 10) / 10;
 }
 
-export const useStore = create<AppState>((set) => ({
-  // Initial state
-  connectionStatus: 'disconnected',
+// Default initial state (for reset)
+const initialState = {
+  connectionStatus: 'disconnected' as ConnectionStatus,
   lastMessageTs: 0,
   sessionId: null,
-  athletes: {},
-  startLine: null,
-  events: [],
-  deviceHealth: {},
-  heartbeat: null,
+  athletes: {} as Record<string, AthleteState>,
+  startLine: null as StartLineDefinitionPayload | null,
+  events: [] as Array<EventPayload & { ts_ms: number }>,
+  deviceHealth: {} as Record<string, DeviceHealthPayload>,
+  heartbeat: null as HeartbeatPayload | null,
   sortColumn: 'dist_to_line_m',
   sortAscending: true,
   filterText: '',
@@ -182,16 +187,22 @@ export const useStore = create<AppState>((set) => ({
     showLabels: true,
     followSelected: false,
     trackTailSeconds: 0,
-    autoFitBounds: true,  // default: auto adjust enabled
-  },
-  wind: null,
+    autoFitBounds: true,
+  } as MapControls,
+  wind: null as WindData | null,
   measurement: {
     active: false,
     startLatLon: null,
     endLatLon: null,
     distance_m: null,
     bearing_deg: null,
-  },
+  } as MeasurementState,
+  liveMode: true,
+};
+
+export const useStore = create<AppState>((set) => ({
+  // Initial state
+  ...initialState,
 
   // Actions
   setConnectionStatus: (status) => set({ connectionStatus: status }),
@@ -363,4 +374,17 @@ export const useStore = create<AppState>((set) => ({
         bearing_deg: null,
       },
     }),
+
+  setLiveMode: (enabled: boolean) => set({ liveMode: enabled }),
+
+  resetState: () =>
+    set((state) => ({
+      ...initialState,
+      // Preserve connection status as it reflects WebSocket state
+      connectionStatus: state.connectionStatus,
+      // Preserve liveMode (don't reset when clearing replay/live data)
+      liveMode: state.liveMode,
+      // Preserve map controls (labels visibility, etc.)
+      mapControls: state.mapControls,
+    })),
 }));

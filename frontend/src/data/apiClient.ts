@@ -26,7 +26,19 @@ export interface SessionMessagesResponse {
 }
 
 /** Fetch relay/mock server health. */
-export async function fetchHealth(): Promise<Record<string, unknown>> {
+export async function fetchHealth(): Promise<{
+  status: string;
+  uptime_s: number;
+  zmq_position_connected: boolean;
+  zmq_gate_connected: boolean;
+  ws_clients: number;
+  athletes_registered: number;
+  messages_relayed: number;
+  parser_counters: Record<string, unknown>;
+  recording: boolean;
+  recording_session: string | null;
+  message_count?: number;
+}> {
   const res = await fetch(`${API_BASE}/health`);
   if (!res.ok) throw new Error(`Health check failed: ${res.status}`);
   return res.json();

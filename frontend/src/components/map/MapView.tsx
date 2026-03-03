@@ -162,12 +162,21 @@ export function MapView() {
     minimapRef.current = minimapCtrl;
 
     mapRef.current = map;
-    setMapReady(true);
+    // Delay to ensure DOM is fully updated before marking ready
+    requestAnimationFrame(() => {
+      setMapReady(true);
+    });
 
     return () => {
       map.remove();
       mapRef.current = null;
       setMapReady(false);
+      // Clear all refs to prevent stale references
+      markersRef.current = {};
+      labelsRef.current = {};
+      tracksRef.current = {};
+      startLineRef.current = null;
+      anchorMarkersRef.current = [];
     };
   }, []);
 
@@ -285,7 +294,7 @@ export function MapView() {
   useEffect(() => {
     const map = mapRef.current;
     if (!map) return;
-
+    
     const now = Date.now();
     const currentIds = new Set<string>();
 

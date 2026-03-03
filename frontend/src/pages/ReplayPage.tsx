@@ -54,6 +54,18 @@ export function ReplayPage() {
   const [selectedSession, setSelectedSession] = useState<string>(initialSession ?? '');
   const [replayState, setReplayState] = useState<ReplayState | null>(null);
   const handleMessage = useStore((s) => s.handleMessage);
+  const setLiveMode = useStore((s) => s.setLiveMode);
+  const resetState = useStore((s) => s.resetState);
+
+  // Disable live mode and reset state when entering replay, restore on exit
+  useEffect(() => {
+    setLiveMode(false);
+    resetState();
+    return () => {
+      setLiveMode(true);
+      resetState();
+    };
+  }, [setLiveMode, resetState]);
 
   // Create replay engine
   const engineRef = useRef<ReplayEngine | null>(null);
@@ -239,6 +251,17 @@ export function ReplayPage() {
             >
               <div className="absolute -top-1 -left-1.5 w-3 h-3 bg-blue-600 rounded-full" />
             </div>
+
+            {/* 3-minute marker */}
+            {total >= 180000 && (
+              <div
+                className="absolute top-0 bottom-0 w-1 rounded-full bg-blue-500 opacity-80 hover:opacity-100"
+                style={{
+                  left: `${(180000 / total) * 100}%`,
+                }}
+                title="3 minute mark"
+              />
+            )}
 
             {/* Event markers */}
             {replayState.events.map((evt, i) => {
