@@ -14,6 +14,8 @@ import type {
   GateMetricEntry,
   GateAlert,
   StartLineDefinitionPayload,
+  AnchorPositionPayload,
+  AnchorPoint,
   DeviceHealthPayload,
   EventPayload,
   HeartbeatPayload,
@@ -119,6 +121,9 @@ interface AppState {
   // Start line
   startLine: StartLineDefinitionPayload | null;
 
+  // Standalone anchors (not part of start line), keyed by anchor_id
+  extraAnchors: Record<string, AnchorPoint>;
+
   // Events / alerts log (bounded)
   events: Array<EventPayload & { ts_ms: number }>;
 
@@ -176,6 +181,7 @@ const initialState = {
   sessionId: null,
   athletes: {} as Record<string, AthleteState>,
   startLine: null as StartLineDefinitionPayload | null,
+  extraAnchors: {} as Record<string, AnchorPoint>,
   events: [] as Array<EventPayload & { ts_ms: number }>,
   deviceHealth: {} as Record<string, DeviceHealthPayload>,
   heartbeat: null as HeartbeatPayload | null,
@@ -315,6 +321,18 @@ export const useStore = create<AppState>((set) => ({
       case 'heartbeat': {
         const payload = msg.payload as HeartbeatPayload;
         set({ heartbeat: payload, lastMessageTs: now, sessionId: msg.session_id });
+        break;
+      }
+
+      case 'anchor_position': {
+        const payload = msg.payload as AnchorPositionPayload;
+        set((state) => ({
+          extraAnchors: {
+            ...state.extraAnchors,
+            [payload.anchor.anchor_id]: payload.anchor,
+          },
+          lastMessageTs: now,
+        }));
         break;
       }
 

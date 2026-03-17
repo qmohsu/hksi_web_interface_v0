@@ -86,12 +86,14 @@ export function MapView() {
   const tracksRef = useRef<Record<string, L.Polyline>>({});
   const startLineRef = useRef<L.Polyline | null>(null);
   const anchorMarkersRef = useRef<L.Marker[]>([]);
+  const extraAnchorMarkersRef = useRef<Record<string, L.Marker>>({});
   const measureLineRef = useRef<L.Polyline | null>(null);
   const measureMarkersRef = useRef<L.Marker[]>([]);
   const minimapRef = useRef<L.Control | null>(null);
 
   const athletes = useStore((s) => s.athletes);
   const startLine = useStore((s) => s.startLine);
+  const extraAnchors = useStore((s) => s.extraAnchors);
   const mapControls = useStore((s) => s.mapControls);
   const autoFitBounds = useStore((s) => s.mapControls.autoFitBounds);
   const measurement = useStore((s) => s.measurement);
@@ -177,6 +179,7 @@ export function MapView() {
       tracksRef.current = {};
       startLineRef.current = null;
       anchorMarkersRef.current = [];
+      extraAnchorMarkersRef.current = {};
     };
   }, []);
 
@@ -283,6 +286,36 @@ export function MapView() {
       map.fitBounds(L.latLngBounds(left, right).pad(0.5));
     }
   }, [startLine, autoFitBounds, mapReady]);
+
+  // ---------------------------------------------------------------------------
+  // Update extra anchor markers (standalone anchors like A2)
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    const currentIds = new Set(Object.keys(extraAnchors));
+
+    // Add or update markers
+    for (const [anchorId, anchor] of Object.entries(extraAnchors)) {
+      const pos: [number, number] = [anchor.lat, anchor.lon];
+      if (extraAnchorMarkersRef.current[anchorId]) {
+        extraAnchorMarkersRef.current[anchorId].setLatLng(pos);
+      } else {
+        extraAnchorMarkersRef.current[anchorId] = L.marker(pos, { icon: createAnchorIcon() })
+          .bindTooltip(anchorId, { permanent: true, direction: 'top', offset: [0, -12] })
+          .addTo(map);
+      }
+    }
+
+    // Remove stale markers
+    for (const id of Object.keys(extraAnchorMarkersRef.current)) {
+      if (!currentIds.has(id)) {
+        extraAnchorMarkersRef.current[id].remove();
+        delete extraAnchorMarkersRef.current[id];
+      }
+    }
+  }, [extraAnchors, mapReady]);
 
   // ---------------------------------------------------------------------------
   // Update athlete markers, labels, and tracks

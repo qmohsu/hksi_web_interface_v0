@@ -45,6 +45,7 @@ from relay.models import (
     PositionUpdatePayload,
     StartLineDefinitionPayload,
     AnchorPoint,
+    AnchorPositionPayload,
     WSMessage,
 )
 from relay.session_recorder import SessionRecorder
@@ -176,10 +177,14 @@ async def _on_position_message(topic: str, payload: str) -> None:
 
 
 _last_start_line_broadcast_ts: float = 0.0  # rate-limit start-line broadcasts
+_last_anchor_position_broadcast_ts: dict[int, float] = {}  # per-anchor rate-limit
+
+# Device IDs that form the start line (handled by start_line_definition)
+_start_line_device_ids: set[int] = set()
 
 
 async def _update_anchor_and_broadcast(device_id: int, raw_pos) -> None:
-    """Cache anchor positions and broadcast start-line definition when both anchors available."""
+    """Cache anchor positions, broadcast start-line definition and standalone anchor positions."""
     global _last_start_line_broadcast_ts, _messages_relayed
 
     _anchor_positions[device_id] = {
@@ -188,9 +193,43 @@ async def _update_anchor_and_broadcast(device_id: int, raw_pos) -> None:
         "lon": raw_pos.longitude,
     }
 
-    # Check if both anchors are available
     left_id = settings.anchor_left_device_id
     right_id = settings.anchor_right_device_id
+    _start_line_device_ids.clear()
+    _start_line_device_ids.update({left_id, right_id})
+
+    # --- Standalone anchor (not part of start line) ---
+    if device_id not in _start_line_device_ids:
+        now = time.time()
+        if now - _last_anchor_position_broadcast_ts.get(device_id, 0.0) < 5.0:
+            return
+        _last_anchor_position_broadcast_ts[device_id] = now
+
+        anchor_id = f"A{device_id - 101}"
+        now_ms = int(now * 1000)
+        msg = WSMessage(
+            type=MessageType.ANCHOR_POSITION,
+            seq=_next_seq(),
+            ts_ms=now_ms,
+            session_id=_session_id,
+            payload=AnchorPositionPayload(
+                anchor=AnchorPoint(
+                    device_id=device_id,
+                    anchor_id=anchor_id,
+                    lat=raw_pos.latitude,
+                    lon=raw_pos.longitude,
+                ),
+            ),
+        )
+        await _broadcast_and_record(msg.to_json_str())
+        _messages_relayed += 1
+        logger.info(
+            "Anchor position broadcast: %s (device %d) at %.6f,%.6f",
+            anchor_id, device_id, raw_pos.latitude, raw_pos.longitude,
+        )
+        return
+
+    # --- Start-line definition (needs both anchors) ---
     if left_id not in _anchor_positions or right_id not in _anchor_positions:
         return
 

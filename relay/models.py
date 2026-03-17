@@ -25,6 +25,7 @@ class MessageType(str, Enum):
     DEVICE_HEALTH = "device_health"
     EVENT = "event"
     HEARTBEAT = "heartbeat"
+    ANCHOR_POSITION = "anchor_position"
 
 
 class AthleteStatus(str, Enum):
@@ -152,6 +153,12 @@ class StartLineDefinitionPayload(BaseModel):
     quality: GateQuality = GateQuality.UNKNOWN
 
 
+class AnchorPositionPayload(BaseModel):
+    """Payload for anchor_position messages (standalone anchors not part of start line)."""
+
+    anchor: AnchorPoint
+
+
 class DeviceHealthPayload(BaseModel):
     """Payload for device_health messages."""
 
@@ -201,6 +208,7 @@ class WSMessage(BaseModel):
         PositionUpdatePayload
         | GateMetricsPayload
         | StartLineDefinitionPayload
+        | AnchorPositionPayload
         | DeviceHealthPayload
         | EventPayload
         | HeartbeatPayload

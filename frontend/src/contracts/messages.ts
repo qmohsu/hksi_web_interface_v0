@@ -15,7 +15,8 @@ export type MessageType =
   | 'start_line_definition'
   | 'device_health'
   | 'event'
-  | 'heartbeat';
+  | 'heartbeat'
+  | 'anchor_position';
 
 export type AthleteStatus =
   | 'SAFE'
@@ -104,6 +105,10 @@ export interface StartLineDefinitionPayload {
   quality: GateQuality;
 }
 
+export interface AnchorPositionPayload {
+  anchor: AnchorPoint;
+}
+
 export interface DeviceHealthPayload {
   device_id: string;
   device_type: DeviceType;
@@ -151,3 +156,4 @@ export type StartLineDefinitionMessage = WSMessage<StartLineDefinitionPayload>;
 export type DeviceHealthMessage = WSMessage<DeviceHealthPayload>;
 export type EventMessage = WSMessage<EventPayload>;
 export type HeartbeatMessage = WSMessage<HeartbeatPayload>;
+export type AnchorPositionMessage = WSMessage<AnchorPositionPayload>;
