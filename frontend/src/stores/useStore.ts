@@ -82,6 +82,7 @@ export interface MapControls {
   followSelected: boolean;
   trackTailSeconds: number; // 0 = all, otherwise last N seconds
   autoFitBounds: boolean;   // auto adjust map view when start line changes
+  indoorMode: boolean;       // indoor positioning mode (blank map + grid)
 }
 
 // ---------------------------------------------------------------------------
@@ -194,6 +195,7 @@ const initialState = {
     followSelected: false,
     trackTailSeconds: 0,
     autoFitBounds: true,
+    indoorMode: false,
   } as MapControls,
   wind: null as WindData | null,
   measurement: {

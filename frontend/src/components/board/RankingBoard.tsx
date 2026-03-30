@@ -13,6 +13,7 @@ import {
   formatDistance,
   formatEta,
   formatDataAge,
+  formatENU,
   STATUS_COLORS,
   STATUS_TEXT_COLORS,
   STATUS_ICONS,
@@ -51,6 +52,23 @@ function AthleteTooltip({
   athlete: AthleteState;
   position: { top: number; left: number };
 }) {
+  const indoorMode = useStore((s) => s.mapControls.indoorMode);
+  const startLine = useStore((s) => s.startLine);
+  const extraAnchors = useStore((s) => s.extraAnchors);
+
+  // Compute grid origin for ENU display
+  let refLat = 0, refLon = 0;
+  if (startLine) {
+    refLat = startLine.anchor_left.lat;
+    refLon = startLine.anchor_left.lon;
+  } else {
+    const anchors = Object.values(extraAnchors);
+    if (anchors.length > 0) {
+      refLat = anchors[0].lat;
+      refLon = anchors[0].lon;
+    }
+  }
+
   return (
     <div
       className="fixed z-50 bg-slate-800 text-white text-xs rounded-lg shadow-xl px-3 py-2 pointer-events-none"
@@ -66,11 +84,17 @@ function AthleteTooltip({
           <Row label="SOG" value={formatSog(athlete.sog_kn)} />
           <Row label="Avg SOG (10s)" value={formatSog(athlete.avg_sog_kn)} />
           <Row label="COG" value={formatCog(athlete.cog_deg)} />
-          <Row label="Spd to line" value={athlete.speed_to_line_mps != null ? `${athlete.speed_to_line_mps.toFixed(1)} m/s` : '—'} />
-          <Row label="Pos quality" value={athlete.position_quality != null ? `${(athlete.position_quality * 100).toFixed(0)}%` : '—'} />
+          <Row label="Spd to line" value={athlete.speed_to_line_mps != null ? `${athlete.speed_to_line_mps.toFixed(1)} m/s` : '\u2014'} />
+          <Row label="Pos quality" value={athlete.position_quality != null ? `${(athlete.position_quality * 100).toFixed(0)}%` : '\u2014'} />
           <Row label="Data age" value={formatDataAge(athlete.data_age_ms)} />
-          <Row label="Lat" value={athlete.lat.toFixed(6)} />
-          <Row label="Lon" value={athlete.lon.toFixed(6)} />
+          {indoorMode && refLat !== 0 ? (
+            <Row label="Local (E,N)" value={formatENU(athlete.lat, athlete.lon, refLat, refLon)} />
+          ) : (
+            <>
+              <Row label="Lat" value={athlete.lat.toFixed(6)} />
+              <Row label="Lon" value={athlete.lon.toFixed(6)} />
+            </>
+          )}
         </tbody>
       </table>
     </div>

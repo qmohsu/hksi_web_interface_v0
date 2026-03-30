@@ -36,6 +36,33 @@ export function MapControls() {
 
       {expanded && (
         <div className="bg-white/95 backdrop-blur-sm shadow-lg rounded-lg p-3 w-48 border border-slate-200 space-y-3">
+          {/* Indoor/Outdoor mode toggle */}
+          <section>
+            <div className="text-[10px] font-bold text-slate-500 uppercase mb-1.5">Mode</div>
+            <div className="flex gap-1">
+              <button
+                onClick={() => setMapControl('indoorMode', false)}
+                className={`flex-1 px-2 py-1 text-xs rounded border ${
+                  !mapControls.indoorMode
+                    ? 'bg-blue-500 text-white border-blue-500'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                Outdoor
+              </button>
+              <button
+                onClick={() => setMapControl('indoorMode', true)}
+                className={`flex-1 px-2 py-1 text-xs rounded border ${
+                  mapControls.indoorMode
+                    ? 'bg-blue-500 text-white border-blue-500'
+                    : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+                }`}
+              >
+                Indoor
+              </button>
+            </div>
+          </section>
+
           {/* Layer toggles */}
           <section>
             <div className="text-[10px] font-bold text-slate-500 uppercase mb-1.5">Layers</div>

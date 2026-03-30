@@ -120,3 +120,16 @@ export function computeBearing(
     Math.sin(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.cos(dLon);
   return ((Math.atan2(y, x) * 180 / Math.PI) + 360) % 360;
 }
+
+// Approximate meters per degree at ~22.5°N (Hong Kong / Zhuhai)
+const _METERS_PER_DEG_LAT = 111_320.0;
+const _METERS_PER_DEG_LON = 111_320.0 * Math.cos((22.59 * Math.PI) / 180);
+
+/** Format lat/lon as local ENU coordinates (meters) relative to a reference point. */
+export function formatENU(
+  lat: number, lon: number, refLat: number, refLon: number,
+): string {
+  const e = (lon - refLon) * _METERS_PER_DEG_LON;
+  const n = (lat - refLat) * _METERS_PER_DEG_LAT;
+  return `(${e.toFixed(2)}, ${n.toFixed(2)}) m`;
+}
