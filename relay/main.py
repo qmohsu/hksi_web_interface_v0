@@ -147,6 +147,14 @@ async def _on_position_message(topic: str, payload: str) -> None:
         device_ts_ms = raw_pos.device_timestamp_us // 1000
         data_age_ms = max(0, now_ms - device_ts_ms)
 
+        # Discard positions older than 30 seconds
+        if data_age_ms > 30_000:
+            logger.debug(
+                "Discarding stale position for device %d: age=%.1fs",
+                raw_pos.device_id, data_age_ms / 1000,
+            )
+            continue
+
         positions.append(
             PositionEntry(
                 athlete_id=athlete.athlete_id,

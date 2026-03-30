@@ -30,6 +30,7 @@ import type { ConnectionStatus } from '../data/streamClient';
 
 const MAX_TRACK_POINTS = 200; // Per athlete
 const AVG_SOG_WINDOW_MS = 10_000; // Rolling 10s window for avg SOG
+const STALE_ATHLETE_MS = 30_000; // Remove athletes with no update for 30s
 
 export interface TrackPoint {
   lat: number;
@@ -163,6 +164,7 @@ interface AppState {
   setMeasurement: (m: Partial<MeasurementState>) => void;
   clearMeasurement: () => void;
   setLiveMode: (enabled: boolean) => void;
+  purgeStaleAthletes: () => void;
   resetState: () => void;
 }
 
@@ -396,6 +398,20 @@ export const useStore = create<AppState>((set) => ({
     }),
 
   setLiveMode: (enabled: boolean) => set({ liveMode: enabled }),
+
+  purgeStaleAthletes: () =>
+    set((state) => {
+      const now = Date.now();
+      const athletes = { ...state.athletes };
+      let changed = false;
+      for (const id of Object.keys(athletes)) {
+        if (now - athletes[id].last_update_ms > STALE_ATHLETE_MS) {
+          delete athletes[id];
+          changed = true;
+        }
+      }
+      return changed ? { athletes } : state;
+    }),
 
   resetState: () =>
     set((state) => ({

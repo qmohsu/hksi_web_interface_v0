@@ -20,6 +20,7 @@ export function useStream(wsUrl?: string): void {
   const clientRef = useRef<StreamClient | null>(null);
   const setConnectionStatus = useStore((s) => s.setConnectionStatus);
   const handleMessage = useStore((s) => s.handleMessage);
+  const purgeStaleAthletes = useStore((s) => s.purgeStaleAthletes);
 
   // Create a callback that reads liveMode directly from store on each call
   const onMessage = useCallback((msg: WSMessage) => {
@@ -41,10 +42,14 @@ export function useStream(wsUrl?: string): void {
     clientRef.current = client;
     client.connect();
 
+    // Periodically remove athletes with no update for 30s
+    const purgeTimer = setInterval(purgeStaleAthletes, 5_000);
+
     return () => {
       client.disconnect();
       clientRef.current = null;
+      clearInterval(purgeTimer);
     };
     // Re-create client when URL changes
-  }, [wsUrl, setConnectionStatus, onMessage]);
+  }, [wsUrl, setConnectionStatus, onMessage, purgeStaleAthletes]);
 }
