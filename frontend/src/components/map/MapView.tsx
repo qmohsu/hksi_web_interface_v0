@@ -235,19 +235,32 @@ export function MapView() {
   // Compute grid origin from first anchor
   // ---------------------------------------------------------------------------
   const gridOrigin = useMemo(() => {
+    let lat: number | undefined;
+    let lon: number | undefined;
+
     if (startLine) {
-      originRef.current = { lat: startLine.anchor_left.lat, lon: startLine.anchor_left.lon };
-      return originRef.current;
+      lat = startLine.anchor_left.lat;
+      lon = startLine.anchor_left.lon;
+    } else {
+      const anchors = Object.values(extraAnchors);
+      if (anchors.length > 0) {
+        lat = anchors[0].lat;
+        lon = anchors[0].lon;
+      } else {
+        const aths = Object.values(athletes);
+        if (aths.length > 0) {
+          lat = aths[0].lat;
+          lon = aths[0].lon;
+        }
+      }
     }
-    const anchors = Object.values(extraAnchors);
-    if (anchors.length > 0) {
-      originRef.current = { lat: anchors[0].lat, lon: anchors[0].lon };
-      return originRef.current;
-    }
-    const aths = Object.values(athletes);
-    if (aths.length > 0) {
-      originRef.current = { lat: aths[0].lat, lon: aths[0].lon };
-      return originRef.current;
+
+    // Only create a new reference when coordinates actually change
+    const prev = originRef.current;
+    if (lat !== undefined && lon !== undefined) {
+      if (!prev || prev.lat !== lat || prev.lon !== lon) {
+        originRef.current = { lat, lon };
+      }
     }
     return originRef.current;
   }, [startLine, extraAnchors, athletes]);
