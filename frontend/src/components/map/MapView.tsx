@@ -226,6 +226,7 @@ export function MapView() {
   const mapControls = useStore((s) => s.mapControls);
   const autoFitBounds = useStore((s) => s.mapControls.autoFitBounds);
   const indoorMode = useStore((s) => s.mapControls.indoorMode);
+  const showAnchorLabels = useStore((s) => s.mapControls.showAnchorLabels);
   const measurement = useStore((s) => s.measurement);
   const setMeasurement = useStore((s) => s.setMeasurement);
 
@@ -512,27 +513,27 @@ export function MapView() {
 
     const anchorIcon = createAnchorIcon(indoorMode);
 
-    // In indoor mode: show ENU coords in anchor tooltips
-    let leftTooltip = startLine.anchor_left.anchor_id;
-    let rightTooltip = startLine.anchor_right.anchor_id;
-    if (indoorMode && gridOrigin) {
-      const lEnu = latLonToENU(left[0], left[1], gridOrigin.lat, gridOrigin.lon);
-      const rEnu = latLonToENU(right[0], right[1], gridOrigin.lat, gridOrigin.lon);
-      leftTooltip = `${startLine.anchor_left.anchor_id} (${lEnu.e.toFixed(1)}, ${lEnu.n.toFixed(1)})m`;
-      rightTooltip = `${startLine.anchor_right.anchor_id} (${rEnu.e.toFixed(1)}, ${rEnu.n.toFixed(1)})m`;
+    const leftMarker = L.marker(left, { icon: anchorIcon }).addTo(map);
+    const rightMarker = L.marker(right, { icon: anchorIcon }).addTo(map);
+
+    if (showAnchorLabels) {
+      // In indoor mode: show ENU coords in anchor tooltips
+      let leftTooltip = startLine.anchor_left.anchor_id;
+      let rightTooltip = startLine.anchor_right.anchor_id;
+      if (indoorMode && gridOrigin) {
+        const lEnu = latLonToENU(left[0], left[1], gridOrigin.lat, gridOrigin.lon);
+        const rEnu = latLonToENU(right[0], right[1], gridOrigin.lat, gridOrigin.lon);
+        leftTooltip = `${startLine.anchor_left.anchor_id} (${lEnu.e.toFixed(1)}, ${lEnu.n.toFixed(1)})m`;
+        rightTooltip = `${startLine.anchor_right.anchor_id} (${rEnu.e.toFixed(1)}, ${rEnu.n.toFixed(1)})m`;
+      }
+      leftMarker.bindTooltip(leftTooltip, { permanent: true, direction: 'top', offset: [0, -14] });
+      rightMarker.bindTooltip(rightTooltip, { permanent: true, direction: 'top', offset: [0, -14] });
     }
 
-    anchorMarkersRef.current = [
-      L.marker(left, { icon: anchorIcon })
-        .bindTooltip(leftTooltip, { permanent: true, direction: 'top', offset: [0, -14] })
-        .addTo(map),
-      L.marker(right, { icon: anchorIcon })
-        .bindTooltip(rightTooltip, { permanent: true, direction: 'top', offset: [0, -14] })
-        .addTo(map),
-    ];
+    anchorMarkersRef.current = [leftMarker, rightMarker];
 
     // In indoor mode show inter-anchor distance label
-    if (indoorMode) {
+    if (indoorMode && showAnchorLabels) {
       const midLat = (left[0] + right[0]) / 2;
       const midLon = (left[1] + right[1]) / 2;
       const dist = haversineDistance(left[0], left[1], right[0], right[1]);
@@ -553,7 +554,7 @@ export function MapView() {
     if (autoFitBounds && !indoorMode) {
       map.fitBounds(L.latLngBounds(left, right).pad(0.5));
     }
-  }, [startLine, autoFitBounds, mapReady, indoorMode, gridOrigin]);
+  }, [startLine, autoFitBounds, mapReady, indoorMode, gridOrigin, showAnchorLabels]);
 
   // ---------------------------------------------------------------------------
   // Update extra anchor markers (standalone anchors like A2)
@@ -576,13 +577,20 @@ export function MapView() {
       if (extraAnchorMarkersRef.current[anchorId]) {
         extraAnchorMarkersRef.current[anchorId].setLatLng(pos);
         extraAnchorMarkersRef.current[anchorId].setIcon(createAnchorIcon(indoorMode));
-        // Update tooltip
+        // Update or remove tooltip based on showAnchorLabels
         const tt = extraAnchorMarkersRef.current[anchorId].getTooltip();
-        if (tt) tt.setContent(tooltipText);
+        if (showAnchorLabels) {
+          if (tt) tt.setContent(tooltipText);
+          else extraAnchorMarkersRef.current[anchorId].bindTooltip(tooltipText, { permanent: true, direction: 'top', offset: [0, -14] });
+        } else {
+          if (tt) extraAnchorMarkersRef.current[anchorId].unbindTooltip();
+        }
       } else {
-        extraAnchorMarkersRef.current[anchorId] = L.marker(pos, { icon: createAnchorIcon(indoorMode) })
-          .bindTooltip(tooltipText, { permanent: true, direction: 'top', offset: [0, -14] })
-          .addTo(map);
+        const marker = L.marker(pos, { icon: createAnchorIcon(indoorMode) }).addTo(map);
+        if (showAnchorLabels) {
+          marker.bindTooltip(tooltipText, { permanent: true, direction: 'top', offset: [0, -14] });
+        }
+        extraAnchorMarkersRef.current[anchorId] = marker;
       }
     }
 
@@ -592,7 +600,7 @@ export function MapView() {
         delete extraAnchorMarkersRef.current[id];
       }
     }
-  }, [extraAnchors, mapReady, indoorMode, gridOrigin]);
+  }, [extraAnchors, mapReady, indoorMode, gridOrigin, showAnchorLabels]);
 
   // ---------------------------------------------------------------------------
   // Update athlete markers, labels, and tracks
@@ -626,7 +634,7 @@ export function MapView() {
       // --- Permanent label ---
       if (mapControls.showLabels) {
         let labelText: string;
-        if (indoorMode && gridOrigin) {
+        if (indoorMode && gridOrigin && showAnchorLabels) {
           const enu = latLonToENU(athlete.lat, athlete.lon, gridOrigin.lat, gridOrigin.lon);
           labelText = `${athlete.name.split(' ').pop()} (${enu.e.toFixed(1)}, ${enu.n.toFixed(1)})`;
         } else {
@@ -711,7 +719,7 @@ export function MapView() {
         }
       }
     }
-  }, [athleteList, anySelected, mapControls.showTracks, mapControls.showLabels, mapControls.trackTailSeconds, mapReady, indoorMode, gridOrigin]);
+  }, [athleteList, anySelected, mapControls.showTracks, mapControls.showLabels, mapControls.trackTailSeconds, mapReady, indoorMode, gridOrigin, showAnchorLabels]);
 
   // ---------------------------------------------------------------------------
   // Camera follow selected athlete

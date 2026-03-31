@@ -80,6 +80,7 @@ export interface AthleteState {
 export interface MapControls {
   showTracks: boolean;
   showLabels: boolean;
+  showAnchorLabels: boolean; // anchor names + indoor coordinate labels
   followSelected: boolean;
   trackTailSeconds: number; // 0 = all, otherwise last N seconds
   autoFitBounds: boolean;   // auto adjust map view when start line changes
@@ -194,6 +195,7 @@ const initialState = {
   mapControls: {
     showTracks: true,
     showLabels: true,
+    showAnchorLabels: true,
     followSelected: false,
     trackTailSeconds: 0,
     autoFitBounds: true,
